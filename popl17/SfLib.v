@@ -10,7 +10,7 @@
 
 (** * From the Coq Standard Library *)
 
-Require Omega.   (* needed for using the [omega] tactic *)
+Require Lia.
 Require Export Bool.
 Require Export List.
 Require Export Arith.
