@@ -1,7 +1,11 @@
 Upgrade Guide
 ----------------------------
 
-This directory contains many coq proof files written in coq 8.4. Could you upgrade their syntax to be compatible with coq 8.18? Here are the rules:
+This `popl17` directory contains many coq proof files written in coq 8.4. Could you upgrade their syntax to be compatible with coq 8.18? Do not touch other directories
+
+The structure of the project is written in `./AGENT.md`
+
+Here are the rules:
 
 - LibLN and some other libraries are moved to TLC library, when importing them, the TLC prefix will be required.
   - e.g. `Require Import LibLN.` should be replaced with `Require Import TLC.LibLN.`.
