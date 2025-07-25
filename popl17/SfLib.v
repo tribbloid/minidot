@@ -10,11 +10,14 @@
 
 (** * From the Coq Standard Library *)
 
-Require Lia.
+Require Import Lia.
 Require Export Bool.
 Require Export List.
 Require Export Arith.
 Require Export Arith.EqNat.  (* Contains [beq_nat], among other things *)
+
+(* Compatibility alias for beq_nat which is deprecated in Coq 8.18 *)
+Notation beq_nat := Nat.eqb (only parsing).
 
 (** * From Basics.v *)
 
@@ -62,9 +65,9 @@ Theorem andb_true_elim1 : forall b c,
 Proof.
   intros b c H.
   destruct b.
-  Case "b = true".
+  (* Case "b = true" *)
     reflexivity.
-  Case "b = false".
+  (* Case "b = false" *)
     rewrite <- H. reflexivity.  Qed.
 
 (* From Poly.v *)
@@ -102,16 +105,16 @@ Theorem O_le_n : forall n,
   0 <= n.
 Proof.
   induction n as [| n'].
-  Case "n = 0". apply le_n.
-  Case "n = S n'". apply le_S. apply IHn'.
+  (* Case "n = 0" *) apply le_n.
+  (* Case "n = S n'" *) apply le_S. apply IHn'.
 Qed.
 
 Theorem n_le_m__Sn_le_Sm : forall n m,
   n <= m -> S n <= S m.
 Proof.
   intros. induction H as [| m'].
-  Case "H = n <= n". apply le_n.
-  Case "H = n <= S m'". apply le_S in IHle. apply IHle.
+  (* Case "H = n <= n" *) apply le_n.
+  (* Case "H = n <= S m'" *) apply le_S in IHle. apply IHle.
 Qed.
 
 Theorem ble_nat_true : forall n m,
@@ -120,8 +123,8 @@ Proof.
   intros. generalize dependent m.
   induction n as [| n'];
     intros.
-  Case "n = 0". apply O_le_n.
-  Case "n = S n'". destruct m. inversion H.
+  (* Case "n = 0" *) apply O_le_n.
+  (* Case "n = S n'" *) destruct m. inversion H.
     simpl in H. apply n_le_m__Sn_le_Sm. apply IHn'. apply H.
 Qed.
 
@@ -179,11 +182,11 @@ Inductive multi (X:Type) (R: relation X)
                     R x y ->
                     multi X R y z ->
                     multi X R x z.
-Implicit Arguments multi [[X]]. 
+Arguments multi {X} _ _ _.
 
 Tactic Notation "multi_cases" tactic(first) ident(c) :=
   first;
-  [ Case_aux c "multi_refl" | Case_aux c "multi_step" ].
+  [ idtac "multi_refl" | idtac "multi_step" ].
 
 Theorem multi_R : forall (X:Type) (R:relation X) (x y : X),
        R x y -> multi R x y.
@@ -204,14 +207,14 @@ Theorem beq_id_refl : forall i,
   true = beq_id i i.
 Proof.
   intros. destruct i.
-  apply beq_nat_refl.  Qed.
+  unfold beq_id. symmetry. apply Nat.eqb_refl.  Qed.
 
 Theorem beq_id_eq : forall i1 i2,
   true = beq_id i1 i2 -> i1 = i2.
 Proof.
   intros i1 i2 H.
   destruct i1. destruct i2.
-  apply beq_nat_eq in H. subst.
+  unfold beq_id in H. symmetry in H. apply Nat.eqb_eq in H. subst.
   reflexivity.  Qed.
 
 Theorem beq_id_false_not_eq : forall i1 i2,
@@ -219,7 +222,7 @@ Theorem beq_id_false_not_eq : forall i1 i2,
 Proof.
   intros i1 i2 H.
   destruct i1. destruct i2.
-  apply beq_nat_false in H.
+  unfold beq_id in H. apply Nat.eqb_neq in H.
   intros C. apply H. inversion C. reflexivity.  Qed.
 
 Definition partial_map (A:Type) := id -> option A.

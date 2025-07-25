@@ -11,7 +11,7 @@ Require Export SfLib.
 Require Export Arith.EqNat.
 Require Export Arith.Le.
 Require Import Coq.Program.Equality.
-Require Import Omega.
+Require Import Lia.
 Require Import NPeano.
 
 (* ### Syntax ### *)
@@ -63,7 +63,7 @@ Definition aenv := list (venv*ty). (* J environment: abstract at run-time *)
 
 Fixpoint lengthr (l : venv) : nat :=
   match l with
-    | vnil => 0
+    | vnil => O
     | vcons a  l' =>
       S (lengthr l')
   end.
@@ -73,7 +73,7 @@ Fixpoint indexr (n : id) (l : venv) : option vl :=
   match l with
     | vnil => None
     | vcons a  l' =>
-      if (beq_nat n (lengthr l')) then Some a else indexr n l'
+      if (Nat.eqb n (lengthr l')) then Some a else indexr n l'
   end.
 
 
@@ -108,10 +108,10 @@ Fixpoint open_rec (k: nat) (u: ty) (T: ty) { struct T }: ty :=
     | TAll T1 T2  => TAll (open_rec k u T1) (open_rec (S k) u T2)
     | TVarF x => TVarF x
     | TVarH i => TVarH i
-    | TVarB i => if beq_nat k i then u else TVarB i
+    | TVarB i => if Nat.eqb k i then u else TVarB i
   end.
 
-Definition open u T := open_rec 0 u T.
+Definition open u T := open_rec O u T.
 
 (* Locally-nameless encoding with respect to varH variables. *)
 Fixpoint subst (U : ty) (T : ty) {struct T} : ty :=
@@ -121,7 +121,7 @@ Fixpoint subst (U : ty) (T : ty) {struct T} : ty :=
     | TAll T1 T2   => TAll (subst U T1) (subst U T2)
     | TVarB i      => TVarB i
     | TVarF i      => TVarF i
-    | TVarH i      => if beq_nat i 0 then U else TVarH (i-1)
+    | TVarH i => if Nat.eqb i O then U else TVarH (pred i)
   end.
 
 Definition liftb (f: ty -> ty) b :=
@@ -139,7 +139,7 @@ Fixpoint nosubst (T : ty) {struct T} : Prop :=
     | TAll T1 T2   => nosubst T1 /\ nosubst T2
     | TVarB i      => True
     | TVarF i      => True
-    | TVarH i      => i <> 0
+    | TVarH i      => i <> O
   end.
 
 
@@ -156,7 +156,7 @@ Some (Some v))   means result v
 
 Fixpoint teval(n: nat)(env: venv)(t: tm){struct n}: option (option vl) :=
   match n with
-    | 0 => None
+    | O => None
     | S n =>
       match t with
         | tty T        => Some (Some (vty env T))
@@ -198,7 +198,7 @@ Fixpoint shift_ty (u:nat) (T : ty) {struct T} : ty :=
     | TFun T1 T2  => TFun (shift_ty u T1) (shift_ty u T2)
     | TAll T1 T2  => TAll (shift_ty u T1) (shift_ty u T2)
     | TVarF i     => TVarF i
-    | TVarH i     => TVarH (i+u)
+    | TVarH i     => TVarH (i + u)
     | TVarB i     => TVarB i
   end.
 
@@ -220,27 +220,27 @@ Definition et t := match t with
 
 Fixpoint subst_tm (u:tm) (T : tm) {struct T} : tm :=
   match T with
-    | tvar i      => if beq_nat i 0 then u else tvar (i-1)
-    | tabs T1 t   => tabs (subst (et u) T1) (subst_tm (shift_tm 1 u) t)
+    | tvar i => if Nat.eqb i O then u else tvar (pred i)
+    | tabs T1 t   => tabs (subst (et u) T1) (subst_tm (shift_tm (S O) u) t)
     | tapp t1 t2  => tapp (subst_tm u t1) (subst_tm u t2)
-    | ttabs T1 t  => ttabs (subst (et u) T1) (subst_tm (shift_tm 1 u) t)
+    | ttabs T1 t  => ttabs (subst (et u) T1) (subst_tm (shift_tm (S O) u) t)
     | ttapp t1 T2 => ttapp (subst_tm u t1) (subst (et u) T2)
     | tty T       => tty (subst (et u) T)
   end.
 
 Fixpoint subst_ty (u:ty) (T : tm) {struct T} : tm :=
   match T with
-    | tvar i      => if beq_nat i 0 then (tty u) else tvar (i-1)
-    | tabs T1 t   => tabs (subst u T1) (subst_ty (shift_ty 1 u) t)
+    | tvar i => if Nat.eqb i O then (tty u) else tvar (pred i)
+    | tabs T1 t   => tabs (subst u T1) (subst_ty (shift_ty (S O) u) t)
     | tapp t1 t2  => tapp (subst_ty u t1) (subst_ty u t2)
-    | ttabs T1 t  => ttabs (subst u T1) (subst_ty (shift_ty 1 u) t)
+    | ttabs T1 t  => ttabs (subst u T1) (subst_ty (shift_ty (S O) u) t)
     | ttapp t1 T2 => ttapp (subst_ty u t1) (subst u T2)
     | tty T       => tty (subst u T)
   end.
 
 Fixpoint tevals(n: nat)(t: tm){struct n}: option (option tm) :=
   match n with
-    | 0 => None
+    | O => None
     | S n =>
       match t with
         | tty T        => Some (Some (tty T))
@@ -315,7 +315,7 @@ Inductive step : tm -> tm -> Prop :=
 
 Inductive mstep : nat -> tm -> tm -> Prop :=
 | MST_Z : forall t,
-    mstep 0 t t
+    mstep O t t
 | MST_S: forall n t1 t2 t3,
     step t1 t2 ->
     mstep n t2 t3 ->
@@ -326,23 +326,23 @@ Inductive mstep : nat -> tm -> tm -> Prop :=
 
 (* automation *)
 
-Hint Constructors venv.
-Hint Unfold tenv.
+Hint Constructors venv : core.
+Hint Unfold tenv : core.
 
-Hint Unfold open.
-Hint Unfold indexr.
-Hint Unfold length.
+Hint Unfold open : core.
+Hint Unfold indexr : core.
+Hint Unfold length : core.
 
-Hint Constructors ty.
-Hint Constructors tm.
-Hint Constructors vl.
+Hint Constructors ty : core.
+Hint Constructors tm : core.
+Hint Constructors vl : core.
 
-Hint Constructors closed.
+Hint Constructors closed : core.
 
-Hint Constructors option.
-Hint Constructors list.
+Hint Constructors option : core.
+Hint Constructors list : core.
 
-Hint Resolve ex_intro.
+Hint Resolve ex_intro : core.
 
 
 
@@ -354,7 +354,7 @@ Fixpoint subst_ty_all n venv t {struct venv} :=
     | vcons (vabs venv0 T y) tl  => subst TTop (subst_ty_all (S n) tl t) (* use TTop as placeholder *) 
     | vcons (vtabs venv0 T y) tl => subst TTop (subst_ty_all (S n) tl t) (* use TTop as placeholder *)
     | vcons (vty venv0 T) tl     =>
-      subst (shift_ty n (subst_ty_all 0 venv0 T)) (subst_ty_all (S n) tl t)
+      subst (shift_ty n (subst_ty_all O venv0 T)) (subst_ty_all (S n) tl t)
   end.
 
 
@@ -362,11 +362,11 @@ Fixpoint subst_tm_all n venv t {struct venv} :=
   match venv with
     | vnil => t
     | vcons (vabs venv0 T y) tl =>
-      subst_tm (shift_tm n (tabs (subst_ty_all 0 venv0 T) (subst_tm_all 1 venv0 y))) (subst_tm_all (S n) tl t)
+      subst_tm (shift_tm n (tabs (subst_ty_all O venv0 T) (subst_tm_all (S O) venv0 y))) (subst_tm_all (S n) tl t)
     | vcons (vtabs venv0 T y) tl =>
-      subst_tm (shift_tm n (ttabs (subst_ty_all 0 venv0 T) (subst_tm_all 1 venv0 y))) (subst_tm_all (S n) tl t)
+      subst_tm (shift_tm n (ttabs (subst_ty_all O venv0 T) (subst_tm_all (S O) venv0 y))) (subst_tm_all (S n) tl t)
     | vcons (vty venv0 T) tl =>
-      subst_ty (shift_ty n (subst_ty_all 0 venv0 T)) (subst_tm_all (S n) tl t) 
+      subst_ty (shift_ty n (subst_ty_all O venv0 T)) (subst_tm_all (S n) tl t)
   end.
 
 
@@ -374,61 +374,61 @@ Definition subst_tm_res t :=
   match t with
     | None => None
     | Some None => Some None
-    | Some (Some (vabs venv0 T y)) => Some (Some ((tabs (subst_ty_all 0 venv0 T) (subst_tm_all 1 venv0 y))))
-    | Some (Some (vtabs venv0 T y)) => Some (Some ((ttabs (subst_ty_all 0 venv0 T) (subst_tm_all 1 venv0 y))))
-    | Some (Some (vty venv0 T)) => Some (Some (tty (subst_ty_all 0 venv0 T)))
+    | Some (Some (vabs venv0 T y)) => Some (Some ((tabs (subst_ty_all O venv0 T) (subst_tm_all (S O) venv0 y))))
+    | Some (Some (vtabs venv0 T y)) => Some (Some ((ttabs (subst_ty_all O venv0 T) (subst_tm_all (S O) venv0 y))))
+    | Some (Some (vty venv0 T)) => Some (Some (tty (subst_ty_all O venv0 T)))
   end.
 
 
 
 Lemma idx_miss: forall env i l,
   i >= lengthr env ->
-  indexr i env = None /\ subst_tm_all l env (tvar i) = (tvar (i-(lengthr env))).
+  indexr i env = None /\ subst_tm_all l env (tvar i) = (tvar (i - (lengthr env))).
 Proof.
   intros env. induction env.
   - intros. simpl in H. simpl. 
-    assert (i-0=i). omega. rewrite H0. eauto.
+    assert (i - O = i). lia. rewrite H0. eauto.
   - intros. simpl in H. simpl.
-    destruct (IHenv i (S l)) as [A B]. omega. 
+    destruct (IHenv i (S l)) as [A B]. lia.
     rewrite B. simpl. 
-    assert (beq_nat (i - lengthr env) 0 = false). eapply beq_nat_false_iff. omega.
-    assert (beq_nat i (lengthr env) = false). eapply beq_nat_false_iff. omega.
+    assert (Nat.eqb (i - lengthr env) O = false). apply Nat.eqb_neq. lia.
+    assert (Nat.eqb i (lengthr env) = false). apply Nat.eqb_neq. lia.
     rewrite H0. rewrite H1. 
-    assert (i - lengthr env - 1 = i - S (lengthr env)). omega.
-    rewrite H2. 
+    assert (pred (i - lengthr env) = i - S (lengthr env)). lia.
+    rewrite H2.
 
     destruct v; try destruct v; eauto.
 Qed. 
 
 Lemma idx_miss1: forall env i l,
   i >= lengthr env ->
-  subst_tm_all l env (tvar i) = (tvar (i-(lengthr env))).
+  subst_tm_all l env (tvar i) = (tvar (i - (lengthr env))).
 Proof.
   intros env. eapply idx_miss; eauto. 
 Qed. 
 
 Lemma shiftz_id_ty: forall t,
-  shift_ty 0 t = t.
+  shift_ty O t = t.
 Proof.
   intros. induction t; simpl; eauto; try rewrite IHt; try rewrite IHt1; try rewrite IHt2; eauto.
 Qed.
 
 Lemma shiftz_id: forall t,
-  shift_tm 0 t = t.
+  shift_tm O t = t.
 Proof.
   intros. induction t; simpl; eauto; try rewrite IHt; try rewrite IHt1; try rewrite IHt2; eauto; try rewrite shiftz_id_ty; eauto.
 Qed.
 
 
 Lemma shift_add_ty: forall t l1 l2,
-  shift_ty l1 (shift_ty l2 t) = shift_ty (l2+l1) t.
+  shift_ty l1 (shift_ty l2 t) = shift_ty (l2 + l1) t.
 Proof.
   intros. induction t; simpl; eauto; try rewrite IHt; try rewrite IHt1; try rewrite IHt2; eauto.
   rewrite plus_assoc. eauto.
 Qed.
 
 Lemma shift_add: forall t l1 l2,
-  shift_tm l1 (shift_tm l2 t) = shift_tm (l2+l1) t.
+  shift_tm l1 (shift_tm l2 t) = shift_tm (l2 + l1) t.
 Proof.
   intros. induction t; simpl; eauto; try rewrite IHt; try rewrite IHt1; try rewrite IHt2; eauto; try rewrite shift_add_ty; eauto.
   rewrite plus_assoc. eauto.
@@ -440,16 +440,16 @@ Proof.
   intros t. induction t; intros; simpl; eauto.
   - rewrite IHt1. rewrite IHt2. eauto.
   - rewrite IHt1. rewrite IHt2. eauto. 
-  - assert (beq_nat (i + S l) 0 = false). eapply beq_nat_false_iff. omega. rewrite H.
-    assert (i+(S l)-1=i+l). omega. rewrite H0; eauto.
+  - assert (Nat.eqb (i + S l) O = false). apply Nat.eqb_neq. lia. rewrite H.
+    assert (pred (i + S l) = i + l). lia. rewrite H0; eauto.
 Qed.
 
 Lemma subst_shift_id_ty1: forall t u l,
   subst_ty u (shift_tm (S l) t) = shift_tm l t.
 Proof.
   intros t. induction t; intros; simpl; eauto.
-  - assert (beq_nat (i + S l) 0 = false). eapply beq_nat_false_iff. omega. rewrite H.
-    assert (i+(S l)-1=i+l). omega. rewrite H0; eauto.
+  - assert (Nat.eqb (i + S l) O = false). apply Nat.eqb_neq. lia. rewrite H.
+    assert (pred (i + S l) = i + l). lia. rewrite H0; eauto.
   - rewrite IHt. rewrite subst_shift_id_ty. eauto. 
   - rewrite IHt1. rewrite IHt2. eauto. 
   - rewrite IHt. rewrite subst_shift_id_ty. eauto. 
@@ -461,8 +461,8 @@ Lemma subst_shift_id: forall t u l,
   subst_tm u (shift_tm (S l) t) = shift_tm l t.
 Proof.
   intros t. induction t; intros; simpl; eauto.
-  - assert (beq_nat (i + S l) 0 = false). eapply beq_nat_false_iff. omega. rewrite H.
-    assert (i+(S l)-1=i+l). omega. rewrite H0; eauto.
+  - assert (Nat.eqb (i + S l) O = false). apply Nat.eqb_neq. lia. rewrite H.
+    assert (pred (i + S l) = i + l). lia. rewrite H0; eauto.
   - rewrite IHt. rewrite subst_shift_id_ty. eauto. 
   - rewrite IHt1. rewrite IHt2. eauto. 
   - rewrite IHt. rewrite subst_shift_id_ty. eauto. 
@@ -489,10 +489,10 @@ Proof.
   intros env. induction env.
   - intros. inversion H.
   - intros. simpl in H.
-    case_eq (beq_nat i (lengthr env)); intros E.
+    case_eq (Nat.eqb i (lengthr env)); intros E.
     + 
-      assert (beq_nat (i - lengthr env) 0 = true) as E1.
-      eapply beq_nat_true_iff. eapply beq_nat_true_iff in E. omega.
+      assert (Nat.eqb (i - lengthr env) O = true) as E1.
+      apply Nat.eqb_eq. apply Nat.eqb_eq in E. lia.
 
       simpl. rewrite idx_miss1. rewrite idx_miss1. simpl. rewrite E1.
 
@@ -511,10 +511,10 @@ Proof.
       rewrite subst_shift_id_ty1. eauto. 
       simpl. rewrite subst_shift_id_ty. eauto. 
       
-      eapply beq_nat_true_iff in E. omega.
-      eapply beq_nat_true_iff in E. omega.
+      apply Nat.eqb_eq in E. lia.
+      apply Nat.eqb_eq in E. lia.
 
-    + assert (i < lengthr env). rewrite beq_nat_false_iff in E. omega.
+    + assert (i < lengthr env). apply Nat.eqb_neq in E. lia.
       remember (vcons v env) as env1. simpl.
       subst env1. rewrite IHenv. rewrite IHenv.
 
@@ -529,25 +529,25 @@ Qed.
 
 Lemma idx_hit: forall env i,
   i < lengthr env ->
-  subst_tm_res (Some (indexr i env)) = Some (Some (subst_tm_all 0 env (tvar i))).
+  subst_tm_res (Some (indexr i env)) = Some (Some (subst_tm_all O env (tvar i))).
 Proof.
   intros env. induction env.
   - intros. inversion H.
   - intros.
     simpl in H. simpl.
-    case_eq (beq_nat i (lengthr env)); intros E.
-    + eapply beq_nat_true_iff in E.
+    case_eq (Nat.eqb i (lengthr env)); intros E.
+    + apply Nat.eqb_eq in E.
       rewrite idx_miss1. subst i. simpl.      
-      assert (beq_nat (lengthr env - lengthr env) 0 = true). eapply beq_nat_true_iff. omega.
+      assert (Nat.eqb (lengthr env - lengthr env) O = true). apply Nat.eqb_eq. lia.
       rewrite H0.
-      assert (beq_nat (lengthr env) (lengthr env) = true). eapply beq_nat_true_iff. omega.
+      assert (Nat.eqb (lengthr env) (lengthr env) = true). apply Nat.eqb_eq. lia.
       destruct v.  
       rewrite shiftz_id. rewrite shiftz_id_ty. eauto.
       rewrite shiftz_id. rewrite shiftz_id_ty. eauto.
       rewrite shiftz_id_ty. eauto.
-      omega.
-    + assert (i <> lengthr env). eapply beq_nat_false_iff. eauto.
-      assert (i < lengthr env). omega.
+      lia.
+    + assert (i <> lengthr env). apply Nat.eqb_neq. eauto.
+      assert (i < lengthr env). lia.
 
       specialize (IHenv _ H1). 
       rewrite <-(idx_miss2 env _ v) in IHenv . simpl in IHenv. eauto. eauto.
@@ -556,7 +556,7 @@ Qed.
 (* proof of equivalence *)
 
 Theorem big_env_subst: forall n env e1 e2,
-  subst_tm_all 0 env e1 = e2 ->
+  subst_tm_all O env e1 = e2 ->
   subst_tm_res (teval n env e1) = (tevals n e2).
 Proof.   
   intros n. induction n.
@@ -564,7 +564,7 @@ Proof.
   (* S n *) intros.
   destruct e1; simpl; eauto.
   - (* var *)
-    assert (i < lengthr env \/ i >= lengthr env) as L. omega. 
+    assert (i < lengthr env \/ i >= lengthr env) as L. lia.
     destruct L as [L|L].
     + (* hit *) 
       simpl in H.
@@ -573,7 +573,7 @@ Proof.
       * simpl in IX. rewrite IX. destruct v; inversion IX; eauto.
       * inversion IX. 
     +
-      specialize (idx_miss env i 0 L). intros IX. rewrite H in IX.
+      specialize (idx_miss env i O L). intros IX. rewrite H in IX.
       destruct IX as [A B]. rewrite A. rewrite B. eauto. 
 
   - (* tabs *)
@@ -596,8 +596,8 @@ Proof.
 
     rewrite REC in H. subst e2.
     
-    assert (subst_tm_res (teval n env e1_2) = tevals n (subst_tm_all 0 env e1_2)) as HF. eapply IHn; eauto. 
-    assert (subst_tm_res (teval n env e1_1) = tevals n (subst_tm_all 0 env e1_1)) as HX. eapply IHn; eauto.
+    assert (subst_tm_res (teval n env e1_2) = tevals n (subst_tm_all O env e1_2)) as HF. eapply IHn; eauto.
+    assert (subst_tm_res (teval n env e1_1) = tevals n (subst_tm_all O env e1_1)) as HX. eapply IHn; eauto.
     rewrite <-HF. rewrite <-HX. simpl. 
 
     remember ((teval n env e1_2)) as A.
@@ -633,7 +633,7 @@ Proof.
 
     rewrite REC in H. subst e2.
     
-    assert (subst_tm_res (teval n env e1) = tevals n (subst_tm_all 0 env e1)) as HX. eapply IHn; eauto.
+    assert (subst_tm_res (teval n env e1) = tevals n (subst_tm_all O env e1)) as HX. eapply IHn; eauto.
     rewrite <-HX. simpl. 
 
     remember ((teval n env e1)) as B.
@@ -706,23 +706,23 @@ Proof.
       remember (tevals n t1_1) as rf.
       destruct rf. destruct o.
       rewrite (IHn _ (Some t0)).
-      destruct t0; eauto; eapply IHn; eauto; omega.
-      destruct t0; eauto; eapply IHn; eauto; omega.
-      omega.
-      rewrite (IHn _ None). eauto. eauto. omega.
+      destruct t0; eauto; eapply IHn; eauto; lia.
+      destruct t0; eauto; eapply IHn; eauto; lia.
+      lia.
+      rewrite (IHn _ None). eauto. eauto. lia.
       inversion H. 
       
-      eauto. omega.
-      inversion H. rewrite (IHn _ None). eauto. eauto. omega.
+      eauto. lia.
+      inversion H. rewrite (IHn _ None). eauto. eauto. lia.
       inversion H.
  - simpl in H. simpl. 
     remember (tevals n t1) as rf.
       destruct rf. destruct o.
       rewrite (IHn _ (Some t0)). 
-      destruct t0; eauto; eapply IHn; eauto; omega.
-      destruct t0; eauto; eapply IHn; eauto; omega.
-      omega.
-      rewrite (IHn _ None). eauto. eauto. omega.
+      destruct t0; eauto; eapply IHn; eauto; lia.
+      destruct t0; eauto; eapply IHn; eauto; lia.
+      lia.
+      rewrite (IHn _ None). eauto. eauto. lia.
       inversion H. 
 Qed.
 
@@ -730,7 +730,7 @@ Qed.
 
 Lemma value_eval: forall t1,
    value t1 ->
-   forall nu, nu >= 1 -> tevals nu t1 = Some (Some t1).
+   forall nu, nu >= (S O) -> tevals nu t1 = Some (Some t1).
 Proof.
   intros. destruct nu. inversion H0. inversion H; eauto.
 Qed.
@@ -744,38 +744,38 @@ Proof.
   intros ? ? ?. induction H; intros.
   - (* AppAbs *)
     simpl.
-    assert (nu >= 1). destruct nu. inversion H0. omega. 
+    assert (nu >= (S O)). destruct nu. inversion H0. lia.
     rewrite (value_eval v).
     rewrite (value_eval (tabs T1 t12)).
-    eapply H0; omega. constructor.
-    eauto. eauto. eauto. 
+    eapply H0; lia. constructor.
+    eauto. eauto. eauto.
   - (* App1 *)
     simpl. eapply app_inv in H0.
-    repeat destruct H0 as [? H0].
+    repeat destruct H0 as [x H0].
     destruct H0 as [N [E1 [E2 E3]]].
-    subst nu. eapply IHstep in E1.
+    eapply IHstep in E1.
     eapply eval_stable in E2.
-    rewrite E1. rewrite E2. eapply eval_stable. eapply E3. eauto. eauto. 
+    rewrite E1. rewrite E2. eapply eval_stable. eapply E3. eauto. eauto.
   - (* App2 *)
     simpl. eapply app_inv in H1.
-    repeat destruct H1 as [? H1].
+    repeat destruct H1 as [x H1].
     destruct H1 as [N [E1 [E2 E3]]].
-    subst nu. eapply IHstep in E2.
+    eapply IHstep in E2.
     eapply eval_stable in E1.
     rewrite E1. rewrite E2. eapply eval_stable. eapply E3. eauto. eauto.
   - (* TAppAbs *)
     simpl.
-    assert (nu >= 1). destruct nu. inversion H. omega. 
+    assert (nu >= (S O)). destruct nu. inversion H. lia.
     rewrite (value_eval (ttabs T1 t12)).
-    eapply H; omega. constructor.
+    eapply H; lia. constructor.
     eauto. 
   - (* App1 *)
     simpl. eapply tapp_inv in H0.
-    repeat destruct H0 as [? H0].
+    repeat destruct H0 as [x H0].
     destruct H0 as [N [E1 E2]].
-    subst nu. eapply IHstep in E1.
+    eapply IHstep in E1.
     eapply eval_stable in E2.
-    rewrite E1. rewrite E2. eauto. eauto. 
+    rewrite E1. rewrite E2. eauto. eauto.
 Qed.
     
   
@@ -788,7 +788,7 @@ Proof.
   intros n. induction n.
   (* z *)
   intros. inversion H; subst. 
-  exists 1. eapply value_eval; eauto. 
+  exists (S O). eapply value_eval; eauto.
   (* S n *) 
   intros. inversion H; subst.
   eapply IHn in H3. destruct H3.
@@ -829,7 +829,7 @@ Qed.
 Lemma ms_trans : forall n1 n2 t1 t2 t3,
      mstep n1 t1 t2 ->
      mstep n2 t2 t3 ->
-     mstep (n1+n2) t1 t3.
+     mstep (n1 + n2) t1 t3.
 Proof.
   intros. induction H. eauto. 
   econstructor. eauto. eauto. 

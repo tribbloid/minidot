@@ -5,7 +5,7 @@ Require Export SfLib.
 
 Require Export Arith.EqNat.
 Require Export Arith.Le.
-Require Import Omega.
+Require Import Lia.
 Require Import NPeano.
 
 Module STLC.
@@ -33,19 +33,13 @@ Inductive vl : Type :=
 Definition venv := list vl.
 Definition tenv := list ty.
 
-Hint Unfold venv.
-Hint Unfold tenv.
-
-Fixpoint length {X: Type} (l : list X): nat :=
-  match l with
-    | [] => 0
-    | _::l' => 1 + length l'
-  end.
+Hint Unfold venv : core.
+Hint Unfold tenv : core.
 
 Fixpoint index {X : Type} (n : id) (l : list X) : option X :=
   match l with
     | [] => None
-    | a :: l'  => if beq_nat n (length l') then Some a else index n l'
+    | a :: l'  => if Nat.eqb n (length l') then Some a else index n l'
   end.
 
 
@@ -175,49 +169,49 @@ Fixpoint eval(n: nat)(env: venv)(t: tm){struct n}: option (option vl) :=
 (* end notation *)
 
 
-Hint Constructors ty.
-Hint Constructors tm.
-Hint Constructors vl.
+Hint Constructors ty : core.
+Hint Constructors tm : core.
+Hint Constructors vl : core.
 
 
-Hint Constructors has_type.
-Hint Constructors val_type.
-Hint Constructors wf_env.
+Hint Constructors has_type : core.
+Hint Constructors val_type : core.
+Hint Constructors wf_env : core.
 
-Hint Constructors option.
-Hint Constructors list.
+Hint Constructors option : core.
+Hint Constructors list : core.
 
-Hint Unfold index.
-Hint Unfold length.
+Hint Unfold index : core.
+Hint Unfold length : core.
 
-Hint Resolve ex_intro.
+Hint Resolve ex_intro : core.
 
 Lemma wf_length : forall vs ts,
                     wf_env vs ts ->
                     (length vs = length ts).
 Proof.
   intros. induction H. auto.
-  assert ((length (v::vs)) = 1 + length vs). constructor.
-  assert ((length (t::ts)) = 1 + length ts). constructor.
+  assert (length (v::vs) = S (length vs)). simpl. reflexivity.
+  assert (length (t::ts) = S (length ts)). simpl. reflexivity.
   rewrite IHwf_env in H1. auto.
 Qed.
 
-Hint Immediate wf_length.
+Hint Immediate wf_length : core.
 
 Lemma index_max : forall X vs n (T: X),
                        index n vs = Some T ->
                        n < length vs.
 Proof.
   intros X vs. induction vs.
-  Case "nil". intros. inversion H.
-  Case "cons".
+  (* Case "nil" *) intros. inversion H.
+  (* Case "cons" *)
   intros. inversion H. 
-  case_eq (beq_nat n (length vs)); intros E.
-  SCase "hit".
+  case_eq (Nat.eqb n (length vs)); intros E.
+  (* SCase "hit" *)
   rewrite E in H1. inversion H1. subst.
-  eapply beq_nat_true in E. 
+  apply Nat.eqb_eq in E.
   unfold length. unfold length in E. rewrite E. eauto.
-  SCase "miss".
+  (* SCase "miss" *)
   rewrite E in H1.
   assert (n < length vs). eapply IHvs. apply H1.
   compute. eauto.
@@ -231,8 +225,8 @@ Lemma index_extend : forall X vs n a (T: X),
 Proof.
   intros.
   assert (n < length vs). eapply index_max. eauto.
-  assert (n <> length vs). omega.
-  assert (beq_nat n (length vs) = false) as E. eapply beq_nat_false_iff; eauto.
+  assert (n <> length vs). lia.
+  assert (Nat.eqb n (length vs) = false) as E. apply Nat.eqb_neq; eauto.
   unfold index. unfold index in H. rewrite H. rewrite E. reflexivity.
 Qed.
 
@@ -242,18 +236,18 @@ Lemma index_safe_ex: forall H1 G1 TF i,
              index i G1 = Some TF ->
              exists v, index i H1 = Some v /\ val_type v TF.
 Proof. intros. induction H.
-       Case "nil". inversion H0.
-       Case "cons". inversion H0.
-         case_eq (beq_nat i (length ts)).
-           SCase "hit".
+       (* Case "nil" *) inversion H0.
+       (* Case "cons" *) inversion H0.
+         case_eq (Nat.eqb i (length ts)).
+           (* SCase "hit" *)
              intros E.
              rewrite E in H3. inversion H3. subst t.
-             assert (beq_nat i (length vs) = true). eauto.
+             assert (Nat.eqb i (length vs) = true). eauto.
              assert (index i (v :: vs) = Some v). eauto.  unfold index. rewrite H2. eauto.
              eauto.
-           SCase "miss".
+           (* SCase "miss" *)
              intros E.
-             assert (beq_nat i (length vs) = false). eauto.
+             assert (Nat.eqb i (length vs) = false). eauto.
              rewrite E in H3.
              assert (exists v0, index i vs = Some v0 /\ val_type v0 TF) as HI. eapply IHwf_env. eauto.
            inversion HI as [v0 HI1]. inversion HI1. 
@@ -274,16 +268,16 @@ Proof.
   (* 0   *) intros. inversion H.
   (* S n *) intros. destruct e; inversion H; inversion H0.
   
-  Case "True".  eexists. split. eauto. eapply v_bool.
-  Case "False". eexists. split. eauto. eapply v_bool.
+  (* Case "True" *)  eexists. split. eauto. eapply v_bool.
+  (* Case "False" *) eexists. split. eauto. eapply v_bool.
 
-  Case "Var".
+  (* Case "Var" *)
     destruct (index_safe_ex venv0 tenv0 T i) as [v IV]. eauto. eauto. 
     inversion IV as [I V]. 
 
     rewrite I. eexists. split. eauto. eapply V.
 
-  Case "App". 
+  (* Case "App" *)
     remember (teval n venv0 e1) as tf. (* not stuck *)
     remember (teval n venv0 e2) as tx. 
     subst T.
@@ -305,7 +299,7 @@ Proof.
     inversion HRF as [vf [EF HVF]]. subst. inversion HVF. subst. inversion H3. (* contradiction *)
 
     
-  Case "Abs". 
+  (* Case "Abs" *)
     eexists. split. eauto. eapply v_abs; eauto.
 Qed.
 

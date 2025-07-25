@@ -10,5 +10,9 @@
 *.pdf
 *.glob
 *.vo
+*.vok
+*.vos
 *.v.d
 target/
+
+*.cache
